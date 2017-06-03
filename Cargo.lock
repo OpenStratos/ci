@@ -1,0 +1,4 @@
+[root]
+name = "openstratos-ci"
+version = "0.1.0"
+
