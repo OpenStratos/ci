@@ -12,6 +12,7 @@ extern crate reqwest;
 use std::io::{self, Write, Read};
 use std::process::{Command, exit};
 use std::path::PathBuf;
+use std::env;
 
 use clap::{Arg, App};
 use colored::Colorize;
@@ -78,17 +79,21 @@ fn main() {
 fn run() -> Result<()> {
     let cli = cli().get_matches();
 
-    println!("Please, insert your authentication key:");
-    let mut key = String::new();
-    io::stdin().read_line(&mut key)?;
+    let key = if let Ok(key) = env::var("REST_KEY") {
+        key
+    } else {
 
-    while key.trim().len() != KEY_LEN {
-        println!("Invalid key, please, insert the correct key:");
-        key.clear();
+        println!("Please, insert your authentication key:");
+        let mut key = String::new();
         io::stdin().read_line(&mut key)?;
-    }
-    let key = key.trim();
 
+        while key.trim().len() != KEY_LEN {
+            println!("Invalid key, please, insert the correct key:");
+            key.clear();
+            io::stdin().read_line(&mut key)?;
+        }
+        key.trim().to_owned()
+    };
     println!("Thanks, starting build…");
 
     let mut result = TestResult::default();
