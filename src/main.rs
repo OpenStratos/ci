@@ -104,15 +104,15 @@ fn run() -> Result<()> {
     }
     if cli.is_present("no_sms") {
         features.push("no_sms");
-    } else {
+    } else if cli.is_present("fona") {
         print!("You decided to test by sending SMSs but this can cost you money, are you sure? \
-                  (y/n)");
+                  (y/n) ");
         io::stdout().flush()?;
         let mut response = String::new();
         io::stdin().read_line(&mut response)?;
 
         while response.trim() != "y" && response.trim() != "n" {
-            print!("Please, select 'y' (yes) or 'n' (no)");
+            print!("Please, select 'y' (yes) or 'n' (no) ");
             io::stdout().flush()?;
             response.clear();
             io::stdin().read_line(&mut response)?;
@@ -152,13 +152,19 @@ fn run() -> Result<()> {
     };
     result.features = features;
 
-    println!("Features for the test: '{}'", features_str);
+    if result.features.is_empty() {
+        println!("Testing with no features (not even default features).")
+    } else {
+        println!("Features for the test: '{}'", features_str);
+    }
 
     let mut build = Command::new("cargo");
     build.arg("build").arg("--manifest-path").arg(&manifest);
+
     if !features_str.is_empty() {
         build.arg("--features").arg(&features_str);
     }
+
     let build = build
         .output()
         .chain_err(|| "error running the build command")?;
@@ -181,9 +187,11 @@ fn run() -> Result<()> {
         .arg("--manifest-path")
         .arg(&manifest)
         .arg("--no-default-features");
+
     if !features_str.is_empty() {
         test.arg("--features").arg(&features_str);
     }
+
     let test = test.arg("--")
         .arg("--ignored")
         .output()
