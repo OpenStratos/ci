@@ -14,6 +14,7 @@ use std::process::{Command, exit};
 use std::path::PathBuf;
 
 use clap::{Arg, App};
+use colored::Colorize;
 
 /// OpenStratos repository path.
 const OPENSTRATOS_REPO: &str = "/opt/openstratos/server-rs";
@@ -55,8 +56,6 @@ struct TestResult {
 }
 
 fn main() {
-    use colored::Colorize;
-
     if let Err(e) = run() {
         println!("{}{}", "An error occurred: ".red(), format!("{}", e).red());
 
@@ -90,20 +89,11 @@ fn run() -> Result<()> {
     }
     let key = key.trim();
 
+    println!("Thanks, starting build…");
+
     let mut result = TestResult::default();
     let repo = PathBuf::from(OPENSTRATOS_REPO);
     let manifest = repo.clone().join("Cargo.toml");
-
-    let build = Command::new("cargo")
-        .arg("build")
-        .arg("--manifest-path")
-        .arg(&manifest)
-        .output()
-        .chain_err(|| "error running the build command")?;
-
-    result.build = build.status.success();
-    result.build_stdout = String::from_utf8_lossy(&build.stdout).into_owned();
-    result.build_stderr = String::from_utf8_lossy(&build.stderr).into_owned();
 
     let mut features = Vec::new();
     if cli.is_present("raspicam") {
@@ -147,7 +137,6 @@ fn run() -> Result<()> {
         features.push("no_power_off");
     }
 
-
     let features_str = {
         let mut features_iter = features.iter().cloned();
         let mut features_str: String = if let Some(feature) = features_iter.next() {
@@ -163,13 +152,37 @@ fn run() -> Result<()> {
     };
     result.features = features;
 
+    println!("Features for the test: '{}'", features_str);
+
+    let mut build = Command::new("cargo");
+    build.arg("build").arg("--manifest-path").arg(&manifest);
+    if !features_str.is_empty() {
+        build.arg("--features").arg(&features_str);
+    }
+    let build = build
+        .output()
+        .chain_err(|| "error running the build command")?;
+
+    result.build = build.status.success();
+    result.build_stdout = String::from_utf8_lossy(&build.stdout).into_owned();
+    result.build_stderr = String::from_utf8_lossy(&build.stderr).into_owned();
+
+    println!("Build result: {}",
+             if result.build {
+                 "OK".green()
+             } else {
+                 "ERROR".red()
+             });
+
+    println!("Starting test…");
+
     let mut test = Command::new("cargo");
     test.arg("test")
         .arg("--manifest-path")
         .arg(&manifest)
         .arg("--no-default-features");
     if !features_str.is_empty() {
-        test.arg("--features").arg(features_str);
+        test.arg("--features").arg(&features_str);
     }
     let test = test.arg("--")
         .arg("--ignored")
@@ -180,11 +193,20 @@ fn run() -> Result<()> {
     result.test_stdout = String::from_utf8_lossy(&test.stdout).into_owned();
     result.test_stderr = String::from_utf8_lossy(&test.stderr).into_owned();
 
+    println!("Tests result: {}",
+             if result.test {
+                 "OK".green()
+             } else {
+                 "ERROR".red()
+             });
+
     send_result(key, &result).chain_err(|| "error sending result")
 }
 
 fn send_result<S: Into<String>>(key: S, result: &TestResult) -> Result<()> {
     use reqwest::{Client, StatusCode};
+
+    println!("Sending results to OpenStratos server…");
 
     let client = Client::new()?;
     let mut req = client
@@ -199,6 +221,7 @@ fn send_result<S: Into<String>>(key: S, result: &TestResult) -> Result<()> {
                                    String::from_utf8_lossy(&response).into_owned())
                     .into())
     } else {
+        println!("Results sent successfully.");
         Ok(())
     }
 }
