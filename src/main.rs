@@ -19,7 +19,7 @@ use colored::Colorize;
 /// OpenStratos repository path.
 const OPENSTRATOS_REPO: &str = "/opt/openstratos/server-rs";
 /// OpenStratos REST API endpoint.
-const OPENSTRATOS_REST: &str = "http://staging.openstratos.org/test";
+const OPENSTRATOS_REST: &str = "https://staging.openstratos.org/ci";
 /// OpenStratos REST API key length.
 const KEY_LEN: usize = 20;
 
@@ -52,7 +52,7 @@ struct TestResult {
     test: bool,
     test_stdout: String,
     test_stderr: String,
-    features: Vec<&'static str>,
+    features: Box<[&'static str]>,
 }
 
 fn main() {
@@ -150,7 +150,7 @@ fn run() -> Result<()> {
         }
         features_str
     };
-    result.features = features;
+    result.features = features.into_boxed_slice();
 
     if result.features.is_empty() {
         println!("Testing with no features (not even default features).")
